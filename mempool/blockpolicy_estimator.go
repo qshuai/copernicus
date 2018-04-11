@@ -18,16 +18,18 @@ import (
  * block.
  */
 
+// 该文件代码：费率动态评估算法，还涉及priority
+
 type BlockPolicyEstimator struct {
 	minTrackedFee  utils.FeeRate
 	bestSeenHeight uint
 	txStatsInfo    policy.TxStatsInfo
 
 	/** Classes to track historical data on transaction confirmations*/
-	mapMemPoolTxs *beegoUtils.BeeMap // map[utils.Hash]TxStatsInfo
+	mapMemPoolTxs *beegoUtils.BeeMap // map[utils.Hash]TxStatsInfo		// 被跟踪的交易集合
 	feeStats      policy.TxConfirmStats
-	trackedTxs    uint
-	untranckedTxs uint
+	trackedTxs    uint // 已经跟踪的tx数量
+	untranckedTxs uint // 不跟踪的tx数量
 }
 
 func (blockPolicyEstimator *BlockPolicyEstimator) ProcessTransaction(entry *TxMempoolEntry, validFeeEstimate bool) {
@@ -47,21 +49,23 @@ func (blockPolicyEstimator *BlockPolicyEstimator) ProcessTransaction(entry *TxMe
 	}
 	// Only want to be updating estimates when our blockchain is synced,
 	// otherwise we'll miscalculate how many blocks its taking to get included.
-	if !validFeeEstimate {
+	if !validFeeEstimate { // 不跟踪
 		blockPolicyEstimator.untranckedTxs++
 		return
 	}
-	blockPolicyEstimator.trackedTxs++
+
+	blockPolicyEstimator.trackedTxs++ // 跟踪
 	// Feerates are stored and reported as BCC-per-kb:
 	feeRate := utils.NewFeeRateWithSize(int64(entry.Fee), entry.TxSize)
 	bucketIndex := blockPolicyEstimator.feeStats.NewTx(txHeight, float64(feeRate.GetFeePerK()))
+
 	txStatsInfo := policy.TxStatsInfo{BlockHeight: txHeight, BucketIndex: bucketIndex}
-	blockPolicyEstimator.mapMemPoolTxs.Set(txID, txStatsInfo)
+	blockPolicyEstimator.mapMemPoolTxs.Set(txID, txStatsInfo) // 跟踪交易
 }
 
 func (blockPolicyEstimator *BlockPolicyEstimator) ProcessBlockTx(blockHeight uint, entry *TxMempoolEntry) bool {
 
-	if !blockPolicyEstimator.RemoveTx(entry.TxRef.Hash) {
+	if !blockPolicyEstimator.RemoveTx(entry.TxRef.Hash) { // mapMemPoolTxs中没有这个交易, 没有被跟踪
 		// This transaction wasn't being tracked for fee estimation；
 		return false
 	}
@@ -69,7 +73,7 @@ func (blockPolicyEstimator *BlockPolicyEstimator) ProcessBlockTx(blockHeight uin
 	// How many blocks did it take for miners to include this transaction?
 	// blocksToConfirm is 1-based, so a transaction included in the earliest
 	// possible block has confirmation count of 1
-	blocksToConfirm := blockHeight - entry.EntryHeight
+	blocksToConfirm := blockHeight - entry.EntryHeight // 交易确认数
 	if blocksToConfirm <= 0 {
 		logs.Error("estimatefee Blockpolicy error Transaction had negative blocksToConfirm\n")
 		return false
@@ -176,6 +180,7 @@ func (blockPolicyEstimator *BlockPolicyEstimator) EstimateSmartFee(confTarget in
 	return utils.FeeRate{SataoshisPerK: int64(median)}
 }
 
+// todo rpc request
 func (blockPolicyEstimator *BlockPolicyEstimator) EstimatePriority(confTarget int) float64 {
 
 	return -1

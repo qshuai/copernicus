@@ -28,6 +28,7 @@ const (
 	RollingFeeHalfLife = 60 * 60 * 12
 )
 
+// 一个交易的mempool信息
 type TxMempoolInfo struct {
 	Tx       *core.Tx      // The transaction itself
 	Time     int64         // Time the transaction entered the memPool
@@ -73,52 +74,53 @@ func DeserializeInfo(r io.Reader) (*TxMempoolInfo, error) {
 	}, nil
 }
 
+// 这个结构相当于mempool的管理结构
 type Mempool struct {
-	CheckFrequency              uint32
-	TransactionsUpdated         int
+	CheckFrequency              uint32 // 检查频率
+	TransactionsUpdated         int    // todo ?
 	MinerPolicyEstimator        *BlockPolicyEstimator
-	totalTxSize                 uint64
-	CachedInnerUsage            uint64
+	totalTxSize                 uint64 // tx的总size
+	CachedInnerUsage            uint64 // 内存缓存使用
 	LastRollingFeeUpdate        int64
 	BlockSinceLatRollingFeeBump bool
 	RollingMinimumFeeRate       float64
-	MapTx                       *MultiIndex
-	MapLinks                    *beeUtils.BeeMap    // map[utils.Hash]*Txlinks
-	MapNextTx                   *container.CacheMap // map[refOutPoint]tx
+	MapTx                       *MultiIndex         // 主要用于交易排序 	// todo 这个字段中的PoolNode，已经可以表达vTxHashes的信息
+	MapLinks                    *beeUtils.BeeMap    // map[utils.Hash]*Txlinks		// 父代和子代
+	MapNextTx                   *container.CacheMap // map[refOutPoint]tx		// 引用交易关系  // todo 为什么不存储指针
 	MapDeltas                   map[utils.Hash]PriorityFeeDelta
-	vTxHashes                   []TxHash
+	vTxHashes                   []TxHash // 交易集合  TxMempoolEntry
 	Mtx                         sync.RWMutex
 }
 
 func (mempool *Mempool) RemoveRecursive(origTx *core.Tx, reason PoolRemovalReason) {
 	mempool.Mtx.Lock()
 	defer mempool.Mtx.Unlock()
-	txToRemove := set.New()
+	txToRemove := set.New() // 存储 *TxMempoolEntry结构
 	origit := mempool.MapTx.GetEntryByHash(origTx.Hash)
-	if origit != nil {
+	if origit != nil { // mempool中找的情况
 		txToRemove.Add(origit)
-	} else {
+	} else { // mempool中没找到的情况
 		// When recursively removing but origTx isn't in the mempool be sure
 		// to remove any children that are in the pool. This can happen
 		// during chain re-orgs if origTx isn't re-accepted into the mempool
 		// for any reason.
-		for i := range origTx.Outs {
-			hasTx := mempool.MapNextTx.Get(refOutPoint{origTx.Hash, uint32(i)})
+		for i := range origTx.Outs { // 迭代删除子代
+			hasTx := mempool.MapNextTx.Get(refOutPoint{origTx.Hash, uint32(i)}) // 结构和outpoint一致
 			if hasTx == nil {
 				continue
 			}
 			tx := hasTx.(core.Tx)
 			tmpTxmemPoolEntry := mempool.MapTx.GetEntryByHash(tx.Hash)
-			if tmpTxmemPoolEntry == nil {
+			if tmpTxmemPoolEntry == nil { // todo 子代没有找到的情况应该是允许的  答案：该交易存在于MapNextTx，那么同时也就存在于MapTx，两者应该同时维护
 				panic("the hasTxmemPoolEntry should not be equal nil")
 			}
 			txToRemove.Add(tmpTxmemPoolEntry)
 		}
 	}
-	setAllRemoves := set.New() //the set element type : *TxMempoolEntry
+	setAllRemoves := set.New() // the set element type : *TxMempoolEntry
 	txToRemove.Each(func(item interface{}) bool {
 		tmpTxmemPoolEntry := item.(*TxMempoolEntry)
-		mempool.CalculateDescendants(tmpTxmemPoolEntry, setAllRemoves)
+		mempool.CalculateDescendants(tmpTxmemPoolEntry, setAllRemoves) // 把子代都存在setAllRemoves中
 		return true
 	})
 	mempool.RemoveStaged(setAllRemoves, false, reason)
@@ -131,7 +133,9 @@ func (mempool *Mempool) RemoveRecursive(origTx *core.Tx, reason PoolRemovalReaso
 // it are already in setDescendants as well, so that we can save time by not
 // iterating over those entries.
 func (mempool *Mempool) CalculateDescendants(txEntry *TxMempoolEntry, setDescendants *set.Set) {
-	stage := set.New()
+	stage := set.New() // *TxMempoolEntry
+
+	// setDescendants这个参数传进来的时候为空
 	if has := setDescendants.Has(txEntry); !has {
 		stage.Add(txEntry)
 	}
@@ -303,7 +307,7 @@ func (mempool *Mempool) ClearPrioritisation(hash *utils.Hash) {
  * in a chain before we've updated all the state for the removal.
  */
 func (mempool *Mempool) removeUnchecked(entry *TxMempoolEntry, reason PoolRemovalReason) {
-	//todo: add signal/slot In where for passed entry
+	// todo: add signal/slot In where for passed entry
 	for _, txin := range entry.TxRef.Ins {
 		mempool.MapNextTx.Del(refOutPoint{txin.PreviousOutPoint.Hash, txin.PreviousOutPoint.Index})
 	}
@@ -434,17 +438,18 @@ func (mempool *Mempool) UpdateTransactionsFromBlock(hashesToUpdate container.Vec
 	}
 }
 
+// 通过参数add控制添加或者删除
 func (mempool *Mempool) UpdateChild(entry *TxMempoolEntry, entryChild *TxMempoolEntry, add bool) {
 	s := set.New()
 	hasTxLinks := mempool.MapLinks.Get(entry.TxRef.Hash)
 	if hasTxLinks != nil {
 		txLinks := hasTxLinks.(*TxLinks)
-		children := txLinks.Children
-		if add {
+		children := txLinks.Children // 子交易
+		if add {                     // 添加
 			if ok := children.AddItem(entryChild); ok {
 				mempool.CachedInnerUsage += uint64(IncrementalDynamicUsageTxMempoolEntry(s))
 			}
-		} else {
+		} else { // 删除
 			if ok := children.RemoveItem(entryChild); ok {
 				mempool.CachedInnerUsage -= uint64(IncrementalDynamicUsageTxMempoolEntry(s))
 			}
@@ -452,6 +457,7 @@ func (mempool *Mempool) UpdateChild(entry *TxMempoolEntry, entryChild *TxMempool
 	}
 }
 
+// 同上函数
 func (mempool *Mempool) UpdateParent(entry, entryParent *TxMempoolEntry, add bool) {
 	s := set.New()
 	hasTxLinks := mempool.MapLinks.Get(entry.TxRef.Hash)
@@ -476,7 +482,7 @@ func (mempool *Mempool) GetMempoolChildren(entry *TxMempoolEntry) *container.Set
 	if result == nil {
 		panic("No have children In mempool for this TxmempoolEntry")
 	}
-	return result.(*TxLinks).Children
+	return result.(*TxLinks).Children // 获取子交易
 }
 
 func (mempool *Mempool) GetMemPoolParents(entry *TxMempoolEntry) *container.Set {
@@ -484,7 +490,7 @@ func (mempool *Mempool) GetMemPoolParents(entry *TxMempoolEntry) *container.Set 
 	if result == nil {
 		panic("No have parant In mempool for this TxmempoolEntry")
 	}
-	return result.(*TxLinks).Parents
+	return result.(*TxLinks).Parents // 获取父交易
 }
 
 func (mempool *Mempool) GetMinFee(sizeLimit int64) utils.FeeRate {
@@ -631,7 +637,7 @@ func (mempool *Mempool) AddTransactionsUpdated(n int) {
 	mempool.Mtx.Unlock()
 }
 
-//CalculateMemPoolAncestors try to calculate all in-mempool ancestors of entry.
+// CalculateMemPoolAncestors try to calculate all in-mempool ancestors of entry.
 // (these are all calculated including the tx itself)
 // fSearchForParents = whether to search a tx's vin for in-mempool parents,
 // or look up parents from mapLinks. Must be true for entries not in the mempool
@@ -640,7 +646,7 @@ func (mempool *Mempool) CalculateMemPoolAncestors(entry *TxMempoolEntry, setAnce
 	limitAncestorCount, limitAncestorSize, limitDescendantCount,
 	limitDescendantSize uint64, fSearchForParents bool) error {
 
-	//parentHashes element type is *TxMempoolEntry;
+	// parentHashes element type is *TxMempoolEntry;
 	parentHashes := container.NewSet()
 	tx := entry.TxRef
 
@@ -727,7 +733,7 @@ func (mempool *Mempool) AddUnchecked(hash *utils.Hash, entry *TxMempoolEntry, va
 
 func (mempool *Mempool) AddUncheckedWithAncestors(hash *utils.Hash, entry *TxMempoolEntry, setAncestors *set.Set, validFeeEstimate bool) bool {
 
-	//todo: add signal/slot In where for passed entry
+	// todo: add signal/slot In where for passed entry
 
 	// Add to memory pool without checking anything.
 	// Used by AcceptToMemoryPool(), which DOES do all the appropriate checks.
@@ -901,7 +907,7 @@ func (mempool *Mempool) ReadFeeEstimates(reader io.Reader) error {
 		return err
 	}
 
-	//todo read version that read the file
+	// todo read version that read the file
 	err = mempool.MinerPolicyEstimator.Deserialize(reader, versionThatWrote)
 	return err
 }
@@ -916,7 +922,7 @@ func (mempool *Mempool) RemoveForBlock(vtx []*core.Tx, blockHeight uint) {
 	mempool.Mtx.Lock()
 	defer mempool.Mtx.Unlock()
 	entries := make([]*TxMempoolEntry, 0)
-	//entries element Type : *TxMempoolEntry;
+	// entries element Type : *TxMempoolEntry;
 	for _, tx := range vtx {
 		if entry := mempool.MapTx.GetEntryByHash(tx.Hash); entry != nil {
 			entries = append(entries, entry)

@@ -104,6 +104,7 @@ func (txMempoolEntry *TxMempoolEntry) GetFeeDelta() int64 {
 	return int64(txMempoolEntry.GetModifiedFee()) - int64(txMempoolEntry.Fee)
 }
 
+// 更新一个mempool中一个交易的父交易相关信息 size fee count sigops
 func (txMempoolEntry *TxMempoolEntry) UpdateAncestorState(modifySize, modifyCount, modifySigOps int64, modifyFee utils.Amount) {
 	if modifySize < 0 && uint64(-modifySize) > txMempoolEntry.sizeWithAncestors {
 		panic("the Ancestors's object size should not be negative")
@@ -240,7 +241,7 @@ func CompareTxMempoolEntryByScore(src, dst interface{}) bool {
 }
 
 func IncrementalDynamicUsageTxMempoolEntry(s *set.Set) int64 {
-	return MallocUsage(int64(unsafe.Sizeof(s)))
+	return MallocUsage(int64(unsafe.Sizeof(s))) // 只是一个指针的大小
 }
 
 func NewTxMempoolEntry(txRef *core.Tx, fee utils.Amount, time int64,

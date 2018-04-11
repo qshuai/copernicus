@@ -137,7 +137,7 @@ func setValue(v *container.Vector, eleType int) {
 	}
 }
 
-//ClearCurrent Clear the state of the curBlock variables to start counting for the new block.
+// ClearCurrent Clear the state of the curBlock variables to start counting for the new block.
 func (txConfirmStats *TxConfirmStats) ClearCurrent(blockHeight uint) {
 	for j := 0; j < txConfirmStats.buckets.Size(); j++ {
 		oldUnconfTxNum := txConfirmStats.oldUnconfTxs.Array[j]
@@ -156,7 +156,7 @@ func (txConfirmStats *TxConfirmStats) ClearCurrent(blockHeight uint) {
 	}
 }
 
-//Record a new transaction data point in the current block stats
+// Record a new transaction data point in the current block stats
 // @param blocksToConfirm the number of blocks it took this transaction to confirm
 // @param val the feerate of the transaction
 // @warning blocksToConfirm is 1-based and has to be >= 1
@@ -330,7 +330,7 @@ func (txConfirmStats *TxConfirmStats) EstimateMedianVal(confTarget int, sufficie
 	return median
 }
 
-//NewTx Record a new transaction entering the mempool
+// NewTx Record a new transaction entering the mempool
 func (txConfirmStats *TxConfirmStats) NewTx(nBlockHeight uint, val float64) uint {
 	bucketIndex := txConfirmStats.bucketMap.GetLowerBoundByfloat64(val).(uint)
 	blockIndex := nBlockHeight % uint(txConfirmStats.unconfTxs.Size())
@@ -340,7 +340,7 @@ func (txConfirmStats *TxConfirmStats) NewTx(nBlockHeight uint, val float64) uint
 
 }
 
-//RemoveTx Remove a transaction from mempool tracking stats
+// RemoveTx Remove a transaction from mempool tracking stats
 func (txConfirmStats *TxConfirmStats) RemoveTx(entryHeight, nBestSeenHeight, bucketIndex uint) {
 	// nBestSeenHeight is not updated yet for the new block
 	blocksAgo := int(nBestSeenHeight - entryHeight)
