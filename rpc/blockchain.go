@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"math"
 
 	"github.com/btcboost/copernicus/blockchain"
 	"github.com/btcboost/copernicus/btcjson"
 	"github.com/btcboost/copernicus/core"
+	"github.com/btcboost/copernicus/mempool"
 	"github.com/btcboost/copernicus/net/msg"
 	"github.com/btcboost/copernicus/policy"
 	"github.com/btcboost/copernicus/utils"
@@ -22,10 +24,10 @@ var blockchainHandlers = map[string]commandHandler{
 	"getblockhash":          handleGetBlockHash,   // complete
 	"getblockheader":        handleGetblockheader, // complete
 	"getchaintips":          handleGetChainTips,
-	"getdifficulty":         handleGetDifficulty, //complete
-	"getmempoolancestors":   handleGetMempoolAncestors,
-	"getmempooldescendants": handleGetMempoolDescendants,
-	"getmempoolinfo":        handleGetMempoolInfo, // complete
+	"getdifficulty":         handleGetDifficulty,         //complete
+	"getmempoolancestors":   handleGetMempoolAncestors,   // complete
+	"getmempooldescendants": handleGetMempoolDescendants, //complete
+	"getmempoolinfo":        handleGetMempoolInfo,        // complete
 	"getrawmempool":         handleGetRawMempool,
 	"gettxout":              handleGetTxOut,
 	"gettxoutsetinfo":       handleGetTxoutSetInfo,
@@ -502,11 +504,108 @@ func handleGetDifficulty(s *Server, cmd interface{}, closeChan <-chan struct{}) 
 }
 
 func handleGetMempoolAncestors(s *Server, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	return nil, nil
+	c := cmd.(*btcjson.GetMempoolAncestorsCmd)
+	hash, err := utils.GetHashFromStr(c.TxID)
+	if err != nil {
+		return nil, btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidParameter,
+			Message: "the string " + c.TxID + " is not a standard hash",
+		}
+	}
+	txEntry, ok := blockchain.GMemPool.PoolData[*hash]
+	if !ok {
+		return nil, btcjson.RPCError{
+			Code:    btcjson.RpcInvalidAddressOrKey,
+			Message: "Transaction not in mempool",
+		}
+	}
+
+	noLimit := uint64(math.MaxUint64)
+	txSet, err := blockchain.GMemPool.CalculateMemPoolAncestors(txEntry.Tx, noLimit, noLimit, noLimit, noLimit, false)
+
+	if !c.Verbose {
+		s := make([]string, len(txSet))
+		i := 0
+		for index := range txSet {
+			s[i] = index.Tx.Hash.ToString()
+			i++
+		}
+		return s, nil
+	}
+
+	infos := make(map[string]*btcjson.GetMempoolAncestorsOrDescendantsResultVerbose)
+	for index := range txSet {
+		hash := index.Tx.Hash
+		infos[hash.ToString()] = entryToJSON(index)
+	}
+	return infos, nil
+}
+
+func entryToJSON(entry *mempool.TxEntry) *btcjson.GetMempoolAncestorsOrDescendantsResultVerbose {
+	result := btcjson.GetMempoolAncestorsOrDescendantsResultVerbose{}
+	result.Size = entry.TxSize
+	result.Fee = valueFromAmount(entry.TxFee)
+	result.ModifiedFee = valueFromAmount(entry.SumFeeWithAncestors) // todo check: GetModifiedFee() is equal to SumFeeWithAncestors
+	result.Time = entry.Time
+	result.Height = entry.TxHeight
+	// remove priority at current version
+	result.StartingPriority = 0
+	result.CurrentPriority = 0
+	result.DescendantCount = entry.SumTxCountWithDescendants
+	result.DescendantSize = entry.SumSizeWithDescendants
+	result.DescendantFees = entry.SumFeeWithDescendants
+	result.AncestorCount = entry.SumTxCountWithAncestors
+	result.AncestorSize = entry.SumSizeWitAncestors
+	result.AncestorFees = entry.SumFeeWithAncestors
+
+	setDepends := make([]string, 0)
+	for _, in := range entry.Tx.Ins {
+		if _, ok := blockchain.GMemPool.PoolData[in.PreviousOutPoint.Hash]; ok {
+			setDepends = append(setDepends, in.PreviousOutPoint.Hash.ToString())
+		}
+	}
+	result.Depends = setDepends
+
+	return &result
 }
 
 func handleGetMempoolDescendants(s *Server, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	return nil, nil
+	c := cmd.(*btcjson.GetMempoolDescendantsCmd)
+
+	hash, err := utils.GetHashFromStr(c.TxID)
+	if err != nil {
+		return nil, btcjson.RPCError{
+			Code:    btcjson.ErrInvalidParameter,
+			Message: "error hex string when convert to hash",
+		}
+	}
+
+	entry, ok := blockchain.GMemPool.PoolData[*hash]
+	if !ok {
+		return nil, btcjson.RPCError{
+			Code:    btcjson.RpcInvalidAddressOrKey,
+			Message: "Transaction not in mempool",
+		}
+	}
+
+	descendants := make(map[*mempool.TxEntry]struct{})
+
+	// todo CalculateMemPoolAncestors() and CalculateDescendants() is different API form
+	blockchain.GMemPool.CalculateDescendants(entry, descendants)
+	// CTxMemPool::CalculateDescendants will include the given tx
+	delete(descendants, entry)
+
+	if !c.Verbose {
+		des := make([]string, 0)
+		for item := range descendants {
+			des = append(des, item.Tx.Hash.ToString())
+		}
+		return des, nil
+	}
+
+	infos := make(map[string]*btcjson.GetMempoolAncestorsOrDescendantsResultVerbose)
+	infos[entry.Tx.Hash.ToString()] = entryToJSON(entry)
+	return infos, nil
 }
 
 func handleGetMempoolInfo(s *Server, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {

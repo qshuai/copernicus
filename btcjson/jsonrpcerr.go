@@ -84,6 +84,88 @@ const (
 )
 
 const (
+	// custom
 	ErrUnDefined        RPCErrorCode = 404
 	ErrInvalidParameter RPCErrorCode = -30
+
+	// BCH v0.16.0
+	// Standard JSON-RPC 2.0 errors
+	// RPC_INVALID_REQUEST is internally mapped to HTTP_BAD_REQUEST (400).
+	// It should not be used for application-layer errors.
+	RpcInvalidRequest = -32600
+	// RPC_METHOD_NOT_FOUND is internally mapped to HTTP_NOT_FOUND (404).
+	// It should not be used for application-layer errors.
+	RpcMethodNotFound  = -32601
+	RPC_INVALID_PARAMS = -32602
+	// RPC_INTERNAL_ERROR should only be used for genuine errors in bitcoind
+	// (for exampled datadir corruption).
+	RpcInternalError = -32603
+	RpcParseError    = -32700
+
+	// General application defined errors
+	// std::exception thrown in command handling
+	RpcMiscError = -1
+	// Server is in safe mode, and command is not allowed in safe mode
+	RpcForbiddenBySafeMode = -2
+	// Unexpected type was passed as parameter
+	RpcTypeError = -3
+	// Invalid address or key
+	RpcInvalidAddressOrKey = -5
+	// Ran out of memory during operation
+	RpcOutOfMemory = -7
+	// Invalid, missing or duplicate parameter
+	RpcInvalidParameter = -8
+	// Database error
+	RpcDatabaseError = -20
+	// Error parsing or validating structure in raw format
+	RpcDeserializationError = -22
+	// General error during transaction or block submission
+	RpcVerifyError = -25
+	// Transaction or block was rejected by network rules
+	RpcVerifyRejected = -26
+	// Transaction already in chain
+	RpcVerifyAlreadyInChain = -27
+	// Client still warming up
+	RpcInWarmup = -28
+
+	// Aliases for backward compatibility
+	RpcTransactionError          = RpcVerifyError
+	RpcTransactionRejected       = RpcVerifyRejected
+	RpcTransactionAlreadyInChain = RpcVerifyAlreadyInChain
+
+	// P2P client errors
+	// Bitcoin is not connected
+	RpcClientNotConnected = -9
+	// Still downloading initial blocks
+	RpcClientInInitialDownload = -10
+	// Node is already added
+	RpcClientNodeAlreadyAdded = -23
+	// Node has not been added before
+	RpcClientNodeNotAdded = -24
+	// Node to disconnect not found in connected nodes
+	RpcClientNodeNotConnected = -29
+	// Invalid IP/Subnet
+	RpcClientInvalidIpOrSubnet = -30
+	// No valid connection manager instance found
+	RpcClientP2pDisabled = -31
+
+	// Wallet errors
+	// Unspecified problem with wallet (key not found etc.)
+	RpcWalletError = -4
+	// Not enough funds in wallet or account
+	RpcWalletInsufficientFunds = -6
+	// Invalid account name
+	RpcWalletInvalidAccountName = -11
+	// Keypool ran out, call keypoolrefill first
+	RpcWalletKeypoolRanOut = -12
+	// Enter the wallet passphrase with walletpassphrase first
+	RpcWalletUnlockNeeded = -13
+	// The wallet passphrase entered was incorrect
+	RpcWalletPassphraseIncorrect = -14
+	// Command given in wrong wallet encryption state (encrypting an encrypted wallet etc.)
+	RpcWalletWrongEncState = -15
+	// Failed to encrypt the wallet
+	RpcWalletEncryptionFailed = -16
+	// Wallet is already unlocked
+	RpcWalletAlreadyUnlocked = -17
 )

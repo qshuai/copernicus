@@ -529,3 +529,21 @@ type ValidateAddressChainResult struct {
 	IsValid bool   `json:"isvalid"`
 	Address string `json:"address,omitempty"`
 }
+
+// todo warning: getmempooldescendants and getmempoolancestors rpc commands return the same following struct as result
+type GetMempoolAncestorsOrDescendantsResultVerbose struct {
+	Size             int      `json:"size"`
+	Fee              string   `json:"fee"`
+	ModifiedFee      string   `json:"modifiedfee"`
+	Time             int64    `json:"time"`
+	Height           int      `json:"height"`
+	StartingPriority float64  `json:"startingpriority"`
+	CurrentPriority  float64  `json:"currentpriority"`
+	DescendantCount  int64    `json:"descendantcount"`
+	DescendantSize   int64    `json:"descendantsize"`
+	DescendantFees   int64    `json:"descendantfees"`
+	AncestorCount    int64    `json:"ancestorcount"`
+	AncestorSize     int64    `json:"ancestorsize"`
+	AncestorFees     int64    `json:"ancestorfees"`
+	Depends          []string `json:"depends"`
+}

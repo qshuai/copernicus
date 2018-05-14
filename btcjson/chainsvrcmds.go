@@ -770,6 +770,16 @@ func NewPruneBlockChainCmd(height *int) *PruneBlockChainCmd {
 	}
 }
 
+type GetMempoolAncestorsCmd struct {
+	TxID    string `json:"txid"`
+	Verbose bool   `json:"verbose";jsonrpcdefault:"false"`
+}
+
+type GetMempoolDescendantsCmd struct {
+	TxID    string `json:"txid"`
+	Verbose bool   `json:"verbose";jsonrpcdefault:"false"`
+}
+
 func init() {
 	// No special flags for commands in this file.
 	flags := UsageFlag(0)

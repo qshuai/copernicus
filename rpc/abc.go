@@ -40,9 +40,7 @@ func handleSetExcessiveBlock(s *Server, cmd interface{}, closeChan <-chan struct
 		}
 	}
 	// settingsToUserAgentString();
-	return btcjson.SetExcessiveBlockResult{
-		Result: "Excessive Block set to " + fmt.Sprintf("%d", c.BlockSize) + " bytes",
-	}, nil
+	return "Excessive Block set to " + fmt.Sprintf("%d", c.BlockSize) + " bytes", nil
 }
 
 func registerABCRPCCommands() {

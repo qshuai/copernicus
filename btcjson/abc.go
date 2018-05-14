@@ -7,7 +7,3 @@ type ExcessiveBlockSizeResult struct {
 type SetExcessiveBlockCmd struct {
 	BlockSize uint64 `json:"blockSize"`
 }
-
-type SetExcessiveBlockResult struct {
-	Result string
-}
