@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/btcboost/copernicus/blockchain"
-	"github.com/btcboost/copernicus/btcjson"
+	"github.com/btcboost/copernicus/internal/btcjson"
 	"github.com/btcboost/copernicus/core"
 	"github.com/btcboost/copernicus/crypto"
 	"github.com/btcboost/copernicus/mempool"

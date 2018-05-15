@@ -2,7 +2,7 @@ package rpc
 
 import (
 	"github.com/btcboost/copernicus/blockchain"
-	"github.com/btcboost/copernicus/btcjson"
+	"github.com/btcboost/copernicus/internal/btcjson"
 	"github.com/btcboost/copernicus/conf"
 	"github.com/btcboost/copernicus/net/protocol"
 	"github.com/btcboost/copernicus/utils"

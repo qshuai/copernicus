@@ -8,7 +8,7 @@ import (
 
 	"github.com/astaxie/beego/logs"
 	"github.com/btcboost/copernicus/blockchain"
-	"github.com/btcboost/copernicus/btcjson"
+	"github.com/btcboost/copernicus/internal/btcjson"
 	"github.com/btcboost/copernicus/consensus"
 	"github.com/btcboost/copernicus/core"
 	"github.com/btcboost/copernicus/mining"
