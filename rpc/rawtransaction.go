@@ -189,6 +189,7 @@ func createVoutList(tx *core.Tx, params *msg.BitcoinParams) []btcjson.Vout {
 }
 
 func ScriptPubKeyToJSON(script *core.Script, includeHex bool) btcjson.ScriptPubKeyResult { // todo complete
+
 	return btcjson.ScriptPubKeyResult{}
 }
 

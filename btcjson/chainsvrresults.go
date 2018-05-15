@@ -297,7 +297,7 @@ type ScriptPubKeyResult struct {
 type GetTxOutResult struct {
 	BestBlock     string             `json:"bestblock"`
 	Confirmations int64              `json:"confirmations"`
-	Value         float64            `json:"value"`
+	Value         string             `json:"value"`
 	ScriptPubKey  ScriptPubKeyResult `json:"scriptPubKey"`
 	Version       int32              `json:"version"`
 	Coinbase      bool               `json:"coinbase"`

@@ -14,8 +14,6 @@ import (
 	"github.com/btcboost/copernicus/policy"
 	"github.com/btcboost/copernicus/utils"
 	"github.com/btcboost/copernicus/utxo"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcutil"
 	"github.com/pkg/errors"
 )
 
@@ -634,108 +632,41 @@ func handleGetTxOut(s *Server, cmd interface{}, closeChan <-chan struct{}) (inte
 	c := cmd.(*btcjson.GetTxOutCmd)
 
 	// Convert the provided transaction hash hex to a Hash.
-	txHash, err := utils.GetHashFromStr(c.Txid)
+	hash, err := utils.GetHashFromStr(c.Txid)
 	if err != nil {
 		return nil, rpcDecodeHexError(c.Txid)
 	}
 
-	vout := c.Vout
-	out := core.OutPoint{Hash: *txHash, Index: vout}
-	includeMempool := true
-	if c.IncludeMempool != nil {
-		includeMempool = *c.IncludeMempool
+	out := core.OutPoint{Hash: *hash, Index: c.Vout}
+
+	coin := &utxo.Coin{}
+	if *c.IncludeMempool {
+		// todo realise CoinsViewMemPool{} in mempool
+	} else {
+		if !blockchain.GCoinsTip.GetCoin(&out, coin) {
+			return nil, nil
+		}
+
 	}
 
-	coin := utxo.Coin{}
-	if includeMempool {
+	bestHash := blockchain.GCoinsTip.GetBestBlock()
+	index := blockchain.GChainActive.FetchBlockIndexByHash(&bestHash)
 
+	var confirmations int
+	if coin.GetHeight() == mempool.MEMPOOL_HEIGHT {
+		confirmations = 0
+	} else {
+		confirmations = index.Height - int(coin.GetHeight()) + 1
 	}
-
-	//// TODO: This is racy.  It should attempt to fetch it directly and check
-	//// the error.
-	//if includeMempool && s.cfg.TxMemPool.HaveTransaction(txHash) {
-	//	tx, err := s.cfg.TxMemPool.FetchTransaction(txHash)
-	//	if err != nil {
-	//		return nil, rpcNoTxInfoError(txHash)
-	//	}
-	//
-	//	mtx := tx.MsgTx()
-	//	if c.Vout > uint32(len(mtx.TxOut)-1) {
-	//		return nil, &btcjson.RPCError{
-	//			Code: btcjson.ErrRPCInvalidTxVout,
-	//			Message: "Output index number (vout) does not " +
-	//				"exist for transaction.",
-	//		}
-	//	}
-	//
-	//	txOut := mtx.TxOut[c.Vout]
-	//	if txOut == nil {
-	//		errStr := fmt.Sprintf("Output index: %d for txid: %s "+
-	//			"does not exist", c.Vout, txHash)
-	//		return nil, internalRPCError(errStr, "")
-	//	}
-	//
-	//	best := s.cfg.Chain.BestSnapshot()
-	//	bestBlockHash = best.Hash.String()
-	//	confirmations = 0
-	//	txVersion = mtx.Version
-	//	value = txOut.Value
-	//	pkScript = txOut.PkScript
-	//	isCoinbase = blockchain.IsCoinBaseTx(mtx)
-	//} else {
-	//	entry, err := s.cfg.Chain.FetchUtxoEntry(txHash)
-	//	if err != nil {
-	//		return nil, rpcNoTxInfoError(txHash)
-	//	}
-	//
-	//	// To match the behavior of the reference client, return nil
-	//	// (JSON null) if the transaction output is spent by another
-	//	// transaction already in the main chain.  Mined transactions
-	//	// that are spent by a mempool transaction are not affected by
-	//	// this.
-	//	if entry == nil || entry.IsOutputSpent(c.Vout) {
-	//		return nil, nil
-	//	}
-	//
-	//	best := s.cfg.Chain.BestSnapshot()
-	//	bestBlockHash = best.Hash.String()
-	//	confirmations = 1 + best.Height - entry.BlockHeight()
-	//	txVersion = entry.Version()
-	//	value = entry.AmountByIndex(c.Vout)
-	//	pkScript = entry.PkScriptByIndex(c.Vout)
-	//	isCoinbase = entry.IsCoinBase()
-	//}
-
-	// Disassemble script into single line printable format.
-	// The disassembled string will contain [error] inline if the script
-	// doesn't fully parse, so ignore the error here.
-	disbuf, _ := txscript.DisasmString(pkScript)
-
-	// Get further info about the script.
-	// Ignore the error here since an error means the script couldn't parse
-	// and there is no additional information about it anyways.
-	scriptClass, addrs, reqSigs, _ := txscript.ExtractPkScriptAddrs(pkScript,
-		s.cfg.ChainParams)
-	addresses := make([]string, len(addrs))
-	for i, addr := range addrs {
-		addresses[i] = addr.EncodeAddress()
-	}
-
 	txOutReply := &btcjson.GetTxOutResult{
-		BestBlock:     bestBlockHash,
+		BestBlock:     index.BlockHash.ToString(),
 		Confirmations: int64(confirmations),
-		Value:         btcutil.Amount(value).ToBTC(),
-		Version:       txVersion,
-		ScriptPubKey: btcjson.ScriptPubKeyResult{
-			Asm:       disbuf,
-			Hex:       hex.EncodeToString(pkScript),
-			ReqSigs:   int32(reqSigs),
-			Type:      scriptClass.String(),
-			Addresses: addresses,
-		},
-		Coinbase: isCoinbase,
+		Value:         valueFromAmount(coin.TxOut.Value),
+		ScriptPubKey:  ScriptPubKeyToJSON(coin.TxOut.Script, true),
+		Coinbase:      coin.IsCoinBase(),
 	}
-	return txOutReply, nil
+
+	return &txOutReply, nil
 }
 
 func handleGetTxoutSetInfo(s *Server, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
