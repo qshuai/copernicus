@@ -18,7 +18,7 @@ type TxEntry struct {
 	// sigOpCount sigop plus P2SH sigops count
 	SigOpCount int
 	// time Local time when entering the memPool
-	time int64
+	Time int64
 	// usageSize and total memory usage
 	usageSize int
 	// childTx the tx's all Descendants transaction
@@ -103,16 +103,16 @@ func (t *TxEntry) UpdateAncestorState(updateCount, updateSize, updateSigOps int,
 
 func (t *TxEntry) Less(than btree.Item) bool {
 	th := than.(*TxEntry)
-	if t.time == th.time {
+	if t.Time == th.Time {
 		return t.Tx.Hash.Cmp(&th.Tx.Hash) > 0
 	}
-	return t.time < th.time
+	return t.Time < th.Time
 }
 
 func NewTxentry(tx *core.Tx, txFee int64, acceptTime int64, height int, lp core.LockPoints, sigOpsCount int, spendCoinbase bool) *TxEntry {
 	t := new(TxEntry)
 	t.Tx = tx
-	t.time = acceptTime
+	t.Time = acceptTime
 	t.TxSize = tx.SerializeSize()
 	t.TxFee = txFee
 	t.usageSize = t.TxSize + int(unsafe.Sizeof(t.lp))
@@ -142,7 +142,7 @@ func (t *TxEntry) GetFeeRate() *utils.FeeRate {
 func (t *TxEntry) GetInfo() *TxMempoolInfo {
 	return &TxMempoolInfo{
 		Tx:      t.Tx,
-		Time:    t.time,
+		Time:    t.Time,
 		FeeRate: *t.GetFeeRate(),
 	}
 }

@@ -53,7 +53,7 @@ func handleValidateAddress(s *Server, cmd interface{}, closeChan <-chan struct{}
 			return result, nil
 		}
 
-		result.Address = addr.EncodeAddress()   */// TODO realise
+		result.Address = addr.EncodeAddress()   */ // TODO realise
 	result.IsValid = true
 
 	return result, nil

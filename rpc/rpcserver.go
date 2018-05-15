@@ -656,7 +656,7 @@ type ServerConfig struct {
 		// These fields define any optional indexes the RPC server can make use
 		// of to provide additional data when queried.
 		TxIndex   *indexers.TxIndex
-		AddrIndex *indexers.AddrIndex*/// todo open
+		AddrIndex *indexers.AddrIndex*/ // todo open
 }
 
 // SetupRPCListeners returns a slice of listeners that are configured for use
@@ -795,7 +795,7 @@ func NewServer(config *ServerConfig) (*Server, error) {
 		//gbtWorkState:           newGbtWorkState(config.TimeSource), // todo open
 		helpCacher:             newHelpCacher(),
 		requestProcessShutdown: make(chan struct{}),
-		quit:                   make(chan int),
+		quit: make(chan int),
 	}
 	if conf.CFG.RPCUser != "" && conf.CFG.RPCPass != "" {
 		fmt.Println("rpcuser", conf.CFG.RPCUser)

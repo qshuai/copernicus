@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"math"
 
 	"github.com/btcboost/copernicus/blockchain"
 	"github.com/btcboost/copernicus/btcjson"
 	"github.com/btcboost/copernicus/core"
+	"github.com/btcboost/copernicus/mempool"
 	"github.com/btcboost/copernicus/net/msg"
 	"github.com/btcboost/copernicus/policy"
 	"github.com/btcboost/copernicus/utils"
@@ -22,10 +24,10 @@ var blockchainHandlers = map[string]commandHandler{
 	"getblockhash":          handleGetBlockHash,   // complete
 	"getblockheader":        handleGetBlockHeader, // complete
 	"getchaintips":          handleGetChainTips,
-	"getdifficulty":         handleGetDifficulty, //complete
-	"getmempoolancestors":   handleGetMempoolAncestors,
-	"getmempooldescendants": handleGetMempoolDescendants,
-	"getmempoolinfo":        handleGetMempoolInfo, // complete
+	"getdifficulty":         handleGetDifficulty,         //complete
+	"getmempoolancestors":   handleGetMempoolAncestors,   // complete
+	"getmempooldescendants": handleGetMempoolDescendants, //complete
+	"getmempoolinfo":        handleGetMempoolInfo,        // complete
 	"getrawmempool":         handleGetRawMempool,
 	"gettxout":              handleGetTxOut,
 	"gettxoutsetinfo":       handleGetTxoutSetInfo,
@@ -318,7 +320,7 @@ func handleGetBlock(s *Server, cmd interface{}, closeChan <-chan struct{}) (inte
 			Code:    btcjson.ErrRPCMisc,
 			Message: "Block not found on disk",
 		}
-	}*/             //TODO
+	}*/ //TODO
 
 	if !verbose {
 		writer := bytes.NewBuffer(nil)
@@ -450,11 +452,108 @@ func handleGetDifficulty(s *Server, cmd interface{}, closeChan <-chan struct{}) 
 }
 
 func handleGetMempoolAncestors(s *Server, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	return nil, nil
+	c := cmd.(*btcjson.GetMempoolAncestorsCmd)
+	hash, err := utils.GetHashFromStr(c.TxID)
+	if err != nil {
+		return nil, btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidParameter,
+			Message: "the string " + c.TxID + " is not a standard hash",
+		}
+	}
+	txEntry, ok := blockchain.GMemPool.PoolData[*hash]
+	if !ok {
+		return nil, btcjson.RPCError{
+			Code:    btcjson.RPCInvalidAddressOrKey,
+			Message: "Transaction not in mempool",
+		}
+	}
+
+	noLimit := uint64(math.MaxUint64)
+	txSet, err := blockchain.GMemPool.CalculateMemPoolAncestors(txEntry.Tx, noLimit, noLimit, noLimit, noLimit, false)
+
+	if !c.Verbose {
+		s := make([]string, len(txSet))
+		i := 0
+		for index := range txSet {
+			s[i] = index.Tx.Hash.ToString()
+			i++
+		}
+		return s, nil
+	}
+
+	infos := make(map[string]*btcjson.GetMempoolAncestorsOrDescendantsResultVerbose)
+	for index := range txSet {
+		hash := index.Tx.Hash
+		infos[hash.ToString()] = entryToJSON(index)
+	}
+	return infos, nil
+}
+
+func entryToJSON(entry *mempool.TxEntry) *btcjson.GetMempoolAncestorsOrDescendantsResultVerbose {
+	result := btcjson.GetMempoolAncestorsOrDescendantsResultVerbose{}
+	result.Size = entry.TxSize
+	result.Fee = valueFromAmount(entry.TxFee)
+	result.ModifiedFee = valueFromAmount(entry.SumFeeWithAncestors) // todo check: GetModifiedFee() is equal to SumFeeWithAncestors
+	result.Time = entry.Time
+	result.Height = entry.TxHeight
+	// remove priority at current version
+	result.StartingPriority = 0
+	result.CurrentPriority = 0
+	result.DescendantCount = entry.SumTxCountWithDescendants
+	result.DescendantSize = entry.SumSizeWithDescendants
+	result.DescendantFees = entry.SumFeeWithDescendants
+	result.AncestorCount = entry.SumTxCountWithAncestors
+	result.AncestorSize = entry.SumSizeWitAncestors
+	result.AncestorFees = entry.SumFeeWithAncestors
+
+	setDepends := make([]string, 0)
+	for _, in := range entry.Tx.Ins {
+		if _, ok := blockchain.GMemPool.PoolData[in.PreviousOutPoint.Hash]; ok {
+			setDepends = append(setDepends, in.PreviousOutPoint.Hash.ToString())
+		}
+	}
+	result.Depends = setDepends
+
+	return &result
 }
 
 func handleGetMempoolDescendants(s *Server, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	return nil, nil
+	c := cmd.(*btcjson.GetMempoolDescendantsCmd)
+
+	hash, err := utils.GetHashFromStr(c.TxID)
+	if err != nil {
+		return nil, btcjson.RPCError{
+			Code:    btcjson.ErrInvalidParameter,
+			Message: "error hex string when convert to hash",
+		}
+	}
+
+	entry, ok := blockchain.GMemPool.PoolData[*hash]
+	if !ok {
+		return nil, btcjson.RPCError{
+			Code:    btcjson.RPCInvalidAddressOrKey,
+			Message: "Transaction not in mempool",
+		}
+	}
+
+	descendants := make(map[*mempool.TxEntry]struct{})
+
+	// todo CalculateMemPoolAncestors() and CalculateDescendants() is different API form
+	blockchain.GMemPool.CalculateDescendants(entry, descendants)
+	// CTxMemPool::CalculateDescendants will include the given tx
+	delete(descendants, entry)
+
+	if !c.Verbose {
+		des := make([]string, 0)
+		for item := range descendants {
+			des = append(des, item.Tx.Hash.ToString())
+		}
+		return des, nil
+	}
+
+	infos := make(map[string]*btcjson.GetMempoolAncestorsOrDescendantsResultVerbose)
+	infos[entry.Tx.Hash.ToString()] = entryToJSON(entry)
+	return infos, nil
 }
 
 func handleGetMempoolInfo(s *Server, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
@@ -635,8 +734,7 @@ func handlePruneBlockChain(s *Server, cmd interface{}, closeChan <-chan struct{}
 	}
 
 	if *height > 1000000000 {
-		var index *core.BlockIndex
-		index = blockchain.GChainActive.FindEarliestAtLeast(int64(*height - 72000))
+		index := blockchain.GChainActive.FindEarliestAtLeast(int64(*height - 72000))
 		if index != nil {
 			return false, &btcjson.RPCError{
 				Code:    btcjson.ErrRPCType,
@@ -647,8 +745,7 @@ func handlePruneBlockChain(s *Server, cmd interface{}, closeChan <-chan struct{}
 	}
 
 	h := *height
-	var chainHeight int
-	chainHeight = blockchain.GChainActive.Height()
+	chainHeight := blockchain.GChainActive.Height()
 	if chainHeight < msg.ActiveNetParams.PruneAfterHeight {
 		return false, &btcjson.RPCError{
 			Code:    btcjson.ErrRPCMisc,
@@ -661,7 +758,7 @@ func handlePruneBlockChain(s *Server, cmd interface{}, closeChan <-chan struct{}
 		}
 	} /*else if h > chainHeight - MIN_BLOCKS_TO_KEEP {
 		h = chainHeight - MIN_BLOCKS_TO_KEEP
-	}*/// TODO realise
+	}*/ // TODO realise
 
 	blockchain.PruneBlockFilesManual(*height)
 	return uint64(*height), nil
@@ -682,7 +779,7 @@ func handleVerifyChain(s *Server, cmd interface{}, closeChan <-chan struct{}) (i
 
 		err := verifyChain(s, checkLevel, checkDepth)
 
-		return err == nil, nil*/// TODO realise
+		return err == nil, nil*/ // TODO realise
 	return nil, nil
 }
 
@@ -739,23 +836,22 @@ func handleReconsiderBlock(s *Server, cmd interface{}, closeChan <-chan struct{}
 	c := cmd.(*btcjson.ReconsiderBlockCmd)
 	hash, _ := utils.GetHashFromStr(c.BlockHash)
 
-	if len(blockchain.MapBlockIndex.Data) == 0 {
+	blockindex := core.ActiveChain.FetchBlockIndexByHash(hash)
+	if blockindex == nil {
 		return nil, &btcjson.RPCError{
 			Code:    btcjson.ErrRPCInvalidAddressOrKey,
 			Message: "Block not found",
 		}
-
-		blkIndex := blockchain.MapBlockIndex.Data[*hash]
-		blockchain.ResetBlockFailureFlags(blkIndex)
 	}
+	blockchain.ResetBlockFailureFlags(blockindex)
 
 	state := core.ValidationState{}
-	//blockchain.ActivateBestChain()             //TODO
+	blockchain.ActivateBestChain(msg.ActiveNetParams, &state, nil)
 
 	if state.IsInvalid() {
 		return nil, &btcjson.RPCError{
 			Code:    btcjson.ErrRPCDatabase,
-			Message: state.GetRejectReason(),
+			Message: blockchain.FormatStateMessage(&state),
 		}
 	}
 	return nil, nil

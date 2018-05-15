@@ -376,7 +376,7 @@ func (m *TxMempool) Expire(time int64) int {
 	toremove := make(map[*TxEntry]struct{}, 100)
 	m.timeSortData.Ascend(func(i btree.Item) bool {
 		entry := i.(*TxEntry)
-		if entry.time < time {
+		if entry.Time < time {
 			toremove[entry] = struct{}{}
 			return true
 		}
