@@ -38,8 +38,8 @@ var blockchainHandlers = map[string]commandHandler{
 	"preciousblock":         handlePreciousblock,   //complete
 
 	/*not shown in help*/
-	"invalidateblock":    handlInvalidateBlock,
-	"reconsiderblock":    handleReconsiderBlock,
+	"invalidateblock":    handlInvalidateBlock,     //complete
+	"reconsiderblock":    handleReconsiderBlock,    //complete
 	"waitfornewblock":    handleWaitForNewBlock,
 	"waitforblock":       handleWaitForBlock,
 	"waitforblockheight": handleWaitForBlockHeight,

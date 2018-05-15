@@ -6,6 +6,7 @@ import (
 	"github.com/btcboost/copernicus/conf"
 	"github.com/btcboost/copernicus/net/protocol"
 	"github.com/btcboost/copernicus/utils"
+	"fmt"
 )
 
 var miscHandlers = map[string]commandHandler{
@@ -142,7 +143,7 @@ func handleEcho(s *Server, cmd interface{}, closeChan <-chan struct{}) (interfac
 }
 
 // handleHelp implements the help command.
-func handleHelp(s *Server, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+func handleHelp(s *Server, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {fmt.Println("-------")
 	c := cmd.(*btcjson.HelpCmd)
 	var command string
 	if c.Command != nil {
