@@ -152,7 +152,7 @@ func TestMethodUsageText(t *testing.T) {
 		{
 			name:     "getblock",
 			method:   "getblock",
-			expected: `getblock "hash" (verbose=true verbosetx=false)`,
+			expected: `getblock "hash" (verbose=true)`,
 		},
 	}
 

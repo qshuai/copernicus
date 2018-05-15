@@ -21,9 +21,9 @@ var blockchainHandlers = map[string]commandHandler{
 	"getblockchaininfo":     handleGetBlockChainInfo,
 	"getbestblockhash":      handleGetBestBlockHash, // complete
 	"getblockcount":         handleGetBlockCount,    // complete
-	"getblock":              handleGetBlock,
-	"getblockhash":          handleGetBlockHash,   // complete
-	"getblockheader":        handleGetBlockHeader, // complete
+	"getblock":              handleGetBlock,         // complete
+	"getblockhash":          handleGetBlockHash,     // complete
+	"getblockheader":        handleGetBlockHeader,   // complete
 	"getchaintips":          handleGetChainTips,
 	"getdifficulty":         handleGetDifficulty,         //complete
 	"getmempoolancestors":   handleGetMempoolAncestors,   // complete
@@ -31,7 +31,7 @@ var blockchainHandlers = map[string]commandHandler{
 	"getmempoolentry":       handleGetMempoolEntry,       // complete
 	"getmempoolinfo":        handleGetMempoolInfo,        // complete
 	"getrawmempool":         handleGetRawMempool,         // complete
-	"gettxout":              handleGetTxOut,
+	"gettxout":              handleGetTxOut,              // complete
 	"gettxoutsetinfo":       handleGetTxoutSetInfo,
 	"pruneblockchain":       handlePruneBlockChain, //complete
 	"verifychain":           handleVerifyChain,     //complete
@@ -300,39 +300,82 @@ func handleGetBlock(s *Server, cmd interface{}, closeChan <-chan struct{}) (inte
 		return nil, rpcDecodeHexError(c.Hash)
 	}
 
-	verbose := *c.Verbose
-	if len(blockchain.MapBlockIndex.Data) == 0 {
+	index := blockchain.GChainActive.FetchBlockIndexByHash(hash)
+	if index == nil {
 		return false, &btcjson.RPCError{
 			Code:    btcjson.ErrRPCInvalidAddressOrKey,
 			Message: "Block not found",
 		}
 	}
-	blk := core.Block{}
-	bIndex := blockchain.MapBlockIndex.Data[*hash]
 
-	if blockchain.GHavePruned && (bIndex.Status&8) != 0 && bIndex.TxCount > 0 {
+	if blockchain.GHavePruned && (index.Status&core.BlockHaveData) == 0 && index.TxCount > 0 {
 		return false, &btcjson.RPCError{
 			Code:    btcjson.ErrRPCMisc,
 			Message: "Block not available (pruned data)",
 		}
 	}
 
-	/*if blockchain.ReadBlockFromDisk() {
+	block := core.Block{}
+	if blockchain.ReadBlockFromDisk(&block, index, msg.ActiveNetParams) {
 		return false, &btcjson.RPCError{
 			Code:    btcjson.ErrRPCMisc,
 			Message: "Block not found on disk",
 		}
-	}*/ //TODO
+	}
 
-	if !verbose {
-		writer := bytes.NewBuffer(nil)
-		blk.Serialize(writer)
-		strHex := hex.EncodeToString(writer.Bytes())
+	if !*c.Verbose {
+		buf := bytes.NewBuffer(nil)
+		block.Serialize(buf)
+		strHex := hex.EncodeToString(buf.Bytes())
 		return strHex, nil
 	}
 
-	// blockToJSON()          // TODO
-	return nil, nil
+	return blockToJSON(&block, index, false), nil
+}
+
+func blockToJSON(block *core.Block, index *core.BlockIndex, txDetails bool) *btcjson.GetBlockVerboseResult {
+	confirmations := -1
+	// Only report confirmations if the block is on the main chain
+	if blockchain.GChainActive.Contains(index) {
+		confirmations = blockchain.GChainActive.Height() - index.Height + 1
+	}
+
+	txs := make([]btcjson.TxRawResult, len(block.Txs))
+	for i, tx := range block.Txs {
+		rawTx, err := createTxRawResult(tx, block.Hash, msg.ActiveNetParams)
+		if err != nil {
+			return nil
+		}
+		txs[i] = *rawTx
+	}
+
+	var previousHash string
+	if index.Prev != nil {
+		previousHash = index.Prev.BlockHash.ToString()
+	}
+
+	var nextBlockHash string
+	next := core.ActiveChain.Next(index)
+	if next != nil {
+		nextBlockHash = next.BlockHash.ToString()
+	}
+	return &btcjson.GetBlockVerboseResult{
+		Hash:          index.GetBlockHash().ToString(),
+		Confirmations: uint64(confirmations),
+		Size:          block.SerializeSize(),
+		Height:        index.Height,
+		Version:       block.BlockHeader.Version,
+		MerkleRoot:    block.BlockHeader.MerkleRoot.ToString(),
+		Tx:            txs,
+		Time:          int64(block.BlockHeader.Time),
+		Mediantime:    index.GetMedianTimePast(),
+		Nonce:         block.BlockHeader.Nonce,
+		Bits:          fmt.Sprintf("%08x", block.BlockHeader.Bits),
+		Difficulty:    getDifficulty(index),
+		ChainWork:     index.ChainWork.String(), // todo check
+		PreviousHash:  previousHash,
+		NextHash:      nextBlockHash,
+	}
 }
 
 func handleGetBlockHash(s *Server, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {

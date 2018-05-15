@@ -16,7 +16,7 @@ import (
 )
 
 var rawTransactionHandlers = map[string]commandHandler{
-	"getrawtransaction":    handleGetRawTransaction,
+	"getrawtransaction":    handleGetRawTransaction, // complete
 	"createrawtransaction": handleCreateRawTransaction,
 	"decoderawtransaction": handleDecodeRawTransaction,
 	"decodescript":         handleDecodeScript,

@@ -144,13 +144,13 @@ func TestChainSvrCmds(t *testing.T) {
 				return btcjson.NewCmd("getblock", "123")
 			},
 			staticCmd: func() interface{} {
-				return btcjson.NewGetBlockCmd("123", nil, nil)
+				return btcjson.NewGetBlockCmd("123", nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getblock","params":["123"],"id":1}`,
 			unmarshalled: &btcjson.GetBlockCmd{
-				Hash:      "123",
-				Verbose:   btcjson.Bool(true),
-				VerboseTx: btcjson.Bool(false),
+				Hash:    "123",
+				Verbose: btcjson.Bool(true),
+				//VerboseTx: btcjson.Bool(false),
 			},
 		},
 		{
@@ -163,28 +163,28 @@ func TestChainSvrCmds(t *testing.T) {
 				return btcjson.NewCmd("getblock", "123", &verbosePtr)
 			},
 			staticCmd: func() interface{} {
-				return btcjson.NewGetBlockCmd("123", btcjson.Bool(true), nil)
+				return btcjson.NewGetBlockCmd("123", btcjson.Bool(true))
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getblock","params":["123",true],"id":1}`,
 			unmarshalled: &btcjson.GetBlockCmd{
-				Hash:      "123",
-				Verbose:   btcjson.Bool(true),
-				VerboseTx: btcjson.Bool(false),
+				Hash:    "123",
+				Verbose: btcjson.Bool(true),
+				//VerboseTx: btcjson.Bool(false),
 			},
 		},
 		{
 			name: "getblock required optional2",
 			newCmd: func() (interface{}, error) {
-				return btcjson.NewCmd("getblock", "123", true, true)
+				return btcjson.NewCmd("getblock", "123", true)
 			},
 			staticCmd: func() interface{} {
-				return btcjson.NewGetBlockCmd("123", btcjson.Bool(true), btcjson.Bool(true))
+				return btcjson.NewGetBlockCmd("123", btcjson.Bool(true))
 			},
-			marshalled: `{"jsonrpc":"1.0","method":"getblock","params":["123",true,true],"id":1}`,
+			marshalled: `{"jsonrpc":"1.0","method":"getblock","params":["123",true],"id":1}`,
 			unmarshalled: &btcjson.GetBlockCmd{
-				Hash:      "123",
-				Verbose:   btcjson.Bool(true),
-				VerboseTx: btcjson.Bool(true),
+				Hash:    "123",
+				Verbose: btcjson.Bool(true),
+				//VerboseTx: btcjson.Bool(true),
 			},
 		},
 		{

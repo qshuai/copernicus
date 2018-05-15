@@ -9,7 +9,7 @@ import (
 )
 
 var miscHandlers = map[string]commandHandler{
-	"getinfo":                handleGetInfo,
+	"getinfo":                handleGetInfo, // complete
 	"validateaddress":        handleValidateAddress,
 	"createmultisig":         handleCreatemultisig,
 	"verifymessage":          handleVerifyMessage,
@@ -32,7 +32,7 @@ func handleGetInfo(s *Server, cmd interface{}, closeChan <-chan struct{}) (inter
 		ProtocolVersion: int32(protocol.BitcoinProtocolVersion),
 		Blocks:          height,
 		TimeOffset:      utils.GetTimeOffset(),
-		//Connections: s.cfg.ConnMgr.ConnectedCount(),
+		//Connections: s.cfg.ConnMgr.ConnectedCount(),		// todo open
 		Proxy:      conf.AppConf.Proxy,
 		Difficulty: getDifficulty(blockchain.GChainActive.Tip()),
 		TestNet:    conf.AppConf.TestNet3,
