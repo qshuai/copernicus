@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/astaxie/beego/logs"
-	"github.com/btcboost/copernicus/btcjson"
+	"github.com/btcboost/copernicus/internal/btcjson"
 	"github.com/btcboost/copernicus/conf"
 )
 
@@ -60,7 +60,6 @@ type Server struct {
 	statusLines  map[int]string
 	statusLock   sync.RWMutex
 	wg           sync.WaitGroup
-	//gbtWorkState           *gbtWorkState
 	helpCacher             *helpCacher
 	requestProcessShutdown chan struct{}
 	quit                   chan int
@@ -468,8 +467,6 @@ func GenCertPair(certFile, keyFile string) error {
 	logs.Info("Done generating TLS certificates")
 	return nil
 }
-
-
 
 // ServerConfig is a descriptor containing the RPC server configuration.
 type ServerConfig struct {
