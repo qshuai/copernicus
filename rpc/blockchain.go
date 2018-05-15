@@ -13,6 +13,9 @@ import (
 	"github.com/btcboost/copernicus/net/msg"
 	"github.com/btcboost/copernicus/policy"
 	"github.com/btcboost/copernicus/utils"
+	"github.com/btcboost/copernicus/utxo"
+	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcutil"
 	"github.com/pkg/errors"
 )
 
@@ -27,8 +30,9 @@ var blockchainHandlers = map[string]commandHandler{
 	"getdifficulty":         handleGetDifficulty,         //complete
 	"getmempoolancestors":   handleGetMempoolAncestors,   // complete
 	"getmempooldescendants": handleGetMempoolDescendants, //complete
+	"getmempoolentry":       handleGetMempoolEntry,       // complete
 	"getmempoolinfo":        handleGetMempoolInfo,        // complete
-	"getrawmempool":         handleGetRawMempool,
+	"getrawmempool":         handleGetRawMempool,         // complete
 	"gettxout":              handleGetTxOut,
 	"gettxoutsetinfo":       handleGetTxoutSetInfo,
 	"pruneblockchain":       handlePruneBlockChain, //complete
@@ -481,7 +485,7 @@ func handleGetMempoolAncestors(s *Server, cmd interface{}, closeChan <-chan stru
 		return s, nil
 	}
 
-	infos := make(map[string]*btcjson.GetMempoolAncestorsOrDescendantsResultVerbose)
+	infos := make(map[string]*btcjson.GetMempoolEntryRelativeInfoVerbose)
 	for index := range txSet {
 		hash := index.Tx.Hash
 		infos[hash.ToString()] = entryToJSON(index)
@@ -489,8 +493,8 @@ func handleGetMempoolAncestors(s *Server, cmd interface{}, closeChan <-chan stru
 	return infos, nil
 }
 
-func entryToJSON(entry *mempool.TxEntry) *btcjson.GetMempoolAncestorsOrDescendantsResultVerbose {
-	result := btcjson.GetMempoolAncestorsOrDescendantsResultVerbose{}
+func entryToJSON(entry *mempool.TxEntry) *btcjson.GetMempoolEntryRelativeInfoVerbose {
+	result := btcjson.GetMempoolEntryRelativeInfoVerbose{}
 	result.Size = entry.TxSize
 	result.Fee = valueFromAmount(entry.TxFee)
 	result.ModifiedFee = valueFromAmount(entry.SumFeeWithAncestors) // todo check: GetModifiedFee() is equal to SumFeeWithAncestors
@@ -522,10 +526,7 @@ func handleGetMempoolDescendants(s *Server, cmd interface{}, closeChan <-chan st
 
 	hash, err := utils.GetHashFromStr(c.TxID)
 	if err != nil {
-		return nil, btcjson.RPCError{
-			Code:    btcjson.ErrInvalidParameter,
-			Message: "error hex string when convert to hash",
-		}
+		return nil, rpcDecodeHexError(c.TxID)
 	}
 
 	entry, ok := blockchain.GMemPool.PoolData[*hash]
@@ -551,9 +552,31 @@ func handleGetMempoolDescendants(s *Server, cmd interface{}, closeChan <-chan st
 		return des, nil
 	}
 
-	infos := make(map[string]*btcjson.GetMempoolAncestorsOrDescendantsResultVerbose)
+	infos := make(map[string]*btcjson.GetMempoolEntryRelativeInfoVerbose)
 	infos[entry.Tx.Hash.ToString()] = entryToJSON(entry)
 	return infos, nil
+}
+
+func handleGetMempoolEntry(s *Server, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.GetMempoolEntryCmd)
+
+	hash, err := utils.GetHashFromStr(c.TxID)
+	if err != nil {
+		return nil, rpcDecodeHexError(c.TxID)
+	}
+
+	blockchain.GMemPool.Lock()
+	defer blockchain.GMemPool.Unlock()
+
+	entry, ok := blockchain.GMemPool.PoolData[*hash]
+	if !ok {
+		return nil, btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidAddressOrKey,
+			Message: "Transaction not in mempool",
+		}
+	}
+
+	return entryToJSON(entry), nil
 }
 
 func handleGetMempoolInfo(s *Server, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
@@ -588,118 +611,131 @@ func valueFromAmount(sizeLimit int64) string {
 }
 
 func handleGetRawMempool(s *Server, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.GetRawMempoolCmd)
+
+	pool := blockchain.GMemPool
+	pool.Lock()
+	defer pool.Unlock()
+
+	if *c.Verbose {
+		infos := make(map[string]*btcjson.GetMempoolEntryRelativeInfoVerbose)
+		for hash, entry := range pool.PoolData {
+			infos[hash.ToString()] = entryToJSON(entry)
+		}
+		return infos, nil
+	}
+
+	// CompareEntryByDepthAndScore() txenry in mempool sorted by depth and score
+	//return mempool.CompareEntryByDepthAndScore(), nil // todo mempool to realise (open)
 	return nil, nil
 }
 
 func handleGetTxOut(s *Server, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.GetTxOutCmd)
 
-	/*	c := cmd.(*btcjson.GetTxOutCmd)
+	// Convert the provided transaction hash hex to a Hash.
+	txHash, err := utils.GetHashFromStr(c.Txid)
+	if err != nil {
+		return nil, rpcDecodeHexError(c.Txid)
+	}
 
-		// Convert the provided transaction hash hex to a Hash.
-		txHash, err := utils.GetHashFromStr(c.Txid)
-		if err != nil {
-			return nil, rpcDecodeHexError(c.Txid)
-		}
+	vout := c.Vout
+	out := core.OutPoint{Hash: *txHash, Index: vout}
+	includeMempool := true
+	if c.IncludeMempool != nil {
+		includeMempool = *c.IncludeMempool
+	}
 
-		vout := c.Vout
-		out := core.OutPoint{Hash:*txHash, Index:vout}
-		includeMempool := true
-		if c.IncludeMempool != nil {
-			includeMempool = *c.IncludeMempool
-		}
+	coin := utxo.Coin{}
+	if includeMempool {
 
-		coin := utxo.Coin{}
-		if includeMempool {
+	}
 
-		}
+	//// TODO: This is racy.  It should attempt to fetch it directly and check
+	//// the error.
+	//if includeMempool && s.cfg.TxMemPool.HaveTransaction(txHash) {
+	//	tx, err := s.cfg.TxMemPool.FetchTransaction(txHash)
+	//	if err != nil {
+	//		return nil, rpcNoTxInfoError(txHash)
+	//	}
+	//
+	//	mtx := tx.MsgTx()
+	//	if c.Vout > uint32(len(mtx.TxOut)-1) {
+	//		return nil, &btcjson.RPCError{
+	//			Code: btcjson.ErrRPCInvalidTxVout,
+	//			Message: "Output index number (vout) does not " +
+	//				"exist for transaction.",
+	//		}
+	//	}
+	//
+	//	txOut := mtx.TxOut[c.Vout]
+	//	if txOut == nil {
+	//		errStr := fmt.Sprintf("Output index: %d for txid: %s "+
+	//			"does not exist", c.Vout, txHash)
+	//		return nil, internalRPCError(errStr, "")
+	//	}
+	//
+	//	best := s.cfg.Chain.BestSnapshot()
+	//	bestBlockHash = best.Hash.String()
+	//	confirmations = 0
+	//	txVersion = mtx.Version
+	//	value = txOut.Value
+	//	pkScript = txOut.PkScript
+	//	isCoinbase = blockchain.IsCoinBaseTx(mtx)
+	//} else {
+	//	entry, err := s.cfg.Chain.FetchUtxoEntry(txHash)
+	//	if err != nil {
+	//		return nil, rpcNoTxInfoError(txHash)
+	//	}
+	//
+	//	// To match the behavior of the reference client, return nil
+	//	// (JSON null) if the transaction output is spent by another
+	//	// transaction already in the main chain.  Mined transactions
+	//	// that are spent by a mempool transaction are not affected by
+	//	// this.
+	//	if entry == nil || entry.IsOutputSpent(c.Vout) {
+	//		return nil, nil
+	//	}
+	//
+	//	best := s.cfg.Chain.BestSnapshot()
+	//	bestBlockHash = best.Hash.String()
+	//	confirmations = 1 + best.Height - entry.BlockHeight()
+	//	txVersion = entry.Version()
+	//	value = entry.AmountByIndex(c.Vout)
+	//	pkScript = entry.PkScriptByIndex(c.Vout)
+	//	isCoinbase = entry.IsCoinBase()
+	//}
 
-		//// TODO: This is racy.  It should attempt to fetch it directly and check
-		//// the error.
-		//if includeMempool && s.cfg.TxMemPool.HaveTransaction(txHash) {
-		//	tx, err := s.cfg.TxMemPool.FetchTransaction(txHash)
-		//	if err != nil {
-		//		return nil, rpcNoTxInfoError(txHash)
-		//	}
-		//
-		//	mtx := tx.MsgTx()
-		//	if c.Vout > uint32(len(mtx.TxOut)-1) {
-		//		return nil, &btcjson.RPCError{
-		//			Code: btcjson.ErrRPCInvalidTxVout,
-		//			Message: "Output index number (vout) does not " +
-		//				"exist for transaction.",
-		//		}
-		//	}
-		//
-		//	txOut := mtx.TxOut[c.Vout]
-		//	if txOut == nil {
-		//		errStr := fmt.Sprintf("Output index: %d for txid: %s "+
-		//			"does not exist", c.Vout, txHash)
-		//		return nil, internalRPCError(errStr, "")
-		//	}
-		//
-		//	best := s.cfg.Chain.BestSnapshot()
-		//	bestBlockHash = best.Hash.String()
-		//	confirmations = 0
-		//	txVersion = mtx.Version
-		//	value = txOut.Value
-		//	pkScript = txOut.PkScript
-		//	isCoinbase = blockchain.IsCoinBaseTx(mtx)
-		//} else {
-		//	entry, err := s.cfg.Chain.FetchUtxoEntry(txHash)
-		//	if err != nil {
-		//		return nil, rpcNoTxInfoError(txHash)
-		//	}
-		//
-		//	// To match the behavior of the reference client, return nil
-		//	// (JSON null) if the transaction output is spent by another
-		//	// transaction already in the main chain.  Mined transactions
-		//	// that are spent by a mempool transaction are not affected by
-		//	// this.
-		//	if entry == nil || entry.IsOutputSpent(c.Vout) {
-		//		return nil, nil
-		//	}
-		//
-		//	best := s.cfg.Chain.BestSnapshot()
-		//	bestBlockHash = best.Hash.String()
-		//	confirmations = 1 + best.Height - entry.BlockHeight()
-		//	txVersion = entry.Version()
-		//	value = entry.AmountByIndex(c.Vout)
-		//	pkScript = entry.PkScriptByIndex(c.Vout)
-		//	isCoinbase = entry.IsCoinBase()
-		//}
+	// Disassemble script into single line printable format.
+	// The disassembled string will contain [error] inline if the script
+	// doesn't fully parse, so ignore the error here.
+	disbuf, _ := txscript.DisasmString(pkScript)
 
-		// Disassemble script into single line printable format.
-		// The disassembled string will contain [error] inline if the script
-		// doesn't fully parse, so ignore the error here.
-		disbuf, _ := txscript.DisasmString(pkScript)
+	// Get further info about the script.
+	// Ignore the error here since an error means the script couldn't parse
+	// and there is no additional information about it anyways.
+	scriptClass, addrs, reqSigs, _ := txscript.ExtractPkScriptAddrs(pkScript,
+		s.cfg.ChainParams)
+	addresses := make([]string, len(addrs))
+	for i, addr := range addrs {
+		addresses[i] = addr.EncodeAddress()
+	}
 
-		// Get further info about the script.
-		// Ignore the error here since an error means the script couldn't parse
-		// and there is no additional information about it anyways.
-		scriptClass, addrs, reqSigs, _ := txscript.ExtractPkScriptAddrs(pkScript,
-			s.cfg.ChainParams)
-		addresses := make([]string, len(addrs))
-		for i, addr := range addrs {
-			addresses[i] = addr.EncodeAddress()
-		}
-
-		txOutReply := &btcjson.GetTxOutResult{
-			BestBlock:     bestBlockHash,
-			Confirmations: int64(confirmations),
-			Value:         btcutil.Amount(value).ToBTC(),
-			Version:       txVersion,
-			ScriptPubKey: btcjson.ScriptPubKeyResult{
-				Asm:       disbuf,
-				Hex:       hex.EncodeToString(pkScript),
-				ReqSigs:   int32(reqSigs),
-				Type:      scriptClass.String(),
-				Addresses: addresses,
-			},
-			Coinbase: isCoinbase,
-		}
-		return txOutReply, nil*/
-
-	return nil, nil
+	txOutReply := &btcjson.GetTxOutResult{
+		BestBlock:     bestBlockHash,
+		Confirmations: int64(confirmations),
+		Value:         btcutil.Amount(value).ToBTC(),
+		Version:       txVersion,
+		ScriptPubKey: btcjson.ScriptPubKeyResult{
+			Asm:       disbuf,
+			Hex:       hex.EncodeToString(pkScript),
+			ReqSigs:   int32(reqSigs),
+			Type:      scriptClass.String(),
+			Addresses: addresses,
+		},
+		Coinbase: isCoinbase,
+	}
+	return txOutReply, nil
 }
 
 func handleGetTxoutSetInfo(s *Server, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {

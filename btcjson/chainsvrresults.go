@@ -530,9 +530,7 @@ type ValidateAddressChainResult struct {
 	Address string `json:"address,omitempty"`
 }
 
-// GetMempoolAncestorsOrDescendantsResultVerbose is response to getmempooldescendants and getmempoolancestors rpc commands
-// todo warning: getmempooldescendants and getmempoolancestors rpc commands return the same following struct as result
-type GetMempoolAncestorsOrDescendantsResultVerbose struct {
+type GetMempoolEntryRelativeInfoVerbose struct {
 	Size             int      `json:"size"`
 	Fee              string   `json:"fee"`
 	ModifiedFee      string   `json:"modifiedfee"`
