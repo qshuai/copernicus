@@ -13,7 +13,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/btcboost/copernicus/btcjson"
+	"github.com/btcboost/copernicus/internal/btcjson"
 	"github.com/btcboost/copernicus/utils"
 	"github.com/jessevdk/go-flags"
 )

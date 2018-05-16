@@ -2,12 +2,10 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package btcjson_test
+package btcjson
 
 import (
 	"testing"
-
-	"github.com/btcboost/copernicus/internal/btcjson"
 )
 
 // TestErrorCodeStringer tests the stringized output for the ErrorCode type.
@@ -15,26 +13,26 @@ func TestErrorCodeStringer(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		in   btcjson.ErrorCode
+		in   ErrorCode
 		want string
 	}{
-		{btcjson.ErrDuplicateMethod, "ErrDuplicateMethod"},
-		{btcjson.ErrInvalidUsageFlags, "ErrInvalidUsageFlags"},
-		{btcjson.ErrInvalidType, "ErrInvalidType"},
-		{btcjson.ErrEmbeddedType, "ErrEmbeddedType"},
-		{btcjson.ErrUnexportedField, "ErrUnexportedField"},
-		{btcjson.ErrUnsupportedFieldType, "ErrUnsupportedFieldType"},
-		{btcjson.ErrNonOptionalField, "ErrNonOptionalField"},
-		{btcjson.ErrNonOptionalDefault, "ErrNonOptionalDefault"},
-		{btcjson.ErrMismatchedDefault, "ErrMismatchedDefault"},
-		{btcjson.ErrUnregisteredMethod, "ErrUnregisteredMethod"},
-		{btcjson.ErrNumParams, "ErrNumParams"},
-		{btcjson.ErrMissingDescription, "ErrMissingDescription"},
+		{ErrDuplicateMethod, "ErrDuplicateMethod"},
+		{ErrInvalidUsageFlags, "ErrInvalidUsageFlags"},
+		{ErrInvalidType, "ErrInvalidType"},
+		{ErrEmbeddedType, "ErrEmbeddedType"},
+		{ErrUnexportedField, "ErrUnexportedField"},
+		{ErrUnsupportedFieldType, "ErrUnsupportedFieldType"},
+		{ErrNonOptionalField, "ErrNonOptionalField"},
+		{ErrNonOptionalDefault, "ErrNonOptionalDefault"},
+		{ErrMismatchedDefault, "ErrMismatchedDefault"},
+		{ErrUnregisteredMethod, "ErrUnregisteredMethod"},
+		{ErrNumParams, "ErrNumParams"},
+		{ErrMissingDescription, "ErrMissingDescription"},
 		{0xffff, "Unknown ErrorCode (65535)"},
 	}
 
 	// Detect additional error codes that don't have the stringer added.
-	if len(tests)-1 != int(btcjson.TstNumErrorCodes) {
+	if len(tests)-1 != int(TstNumErrorCodes) {
 		t.Errorf("It appears an error code was added without adding an " +
 			"associated stringer test")
 	}
@@ -55,15 +53,15 @@ func TestError(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		in   btcjson.Error
+		in   Error
 		want string
 	}{
 		{
-			btcjson.Error{Description: "some error"},
+			Error{Description: "some error"},
 			"some error",
 		},
 		{
-			btcjson.Error{Description: "human-readable error"},
+			Error{Description: "human-readable error"},
 			"human-readable error",
 		},
 	}

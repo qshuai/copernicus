@@ -2,13 +2,11 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package btcjson_test
+package btcjson
 
 import (
 	"encoding/json"
 	"testing"
-
-	"github.com/btcboost/copernicus/internal/btcjson"
 )
 
 // TestChainSvrCustomResults ensures any results that have custom marshalling
@@ -24,7 +22,7 @@ func TestChainSvrCustomResults(t *testing.T) {
 	}{
 		{
 			name: "custom vin marshal with coinbase",
-			result: &btcjson.Vin{
+			result: &Vin{
 				Coinbase: "021234",
 				Sequence: 4294967295,
 			},
@@ -32,10 +30,10 @@ func TestChainSvrCustomResults(t *testing.T) {
 		},
 		{
 			name: "custom vin marshal without coinbase",
-			result: &btcjson.Vin{
+			result: &Vin{
 				Txid: "123",
 				Vout: 1,
-				ScriptSig: &btcjson.ScriptSig{
+				ScriptSig: &ScriptSig{
 					Asm: "0",
 					Hex: "00",
 				},
@@ -45,7 +43,7 @@ func TestChainSvrCustomResults(t *testing.T) {
 		},
 		{
 			name: "custom vinprevout marshal with coinbase",
-			result: &btcjson.VinPrevOut{
+			result: &VinPrevOut{
 				Coinbase: "021234",
 				Sequence: 4294967295,
 			},
@@ -53,14 +51,14 @@ func TestChainSvrCustomResults(t *testing.T) {
 		},
 		{
 			name: "custom vinprevout marshal without coinbase",
-			result: &btcjson.VinPrevOut{
+			result: &VinPrevOut{
 				Txid: "123",
 				Vout: 1,
-				ScriptSig: &btcjson.ScriptSig{
+				ScriptSig: &ScriptSig{
 					Asm: "0",
 					Hex: "00",
 				},
-				PrevOut: &btcjson.PrevOut{
+				PrevOut: &PrevOut{
 					Addresses: []string{"addr1"},
 					Value:     0,
 				},

@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"sync/atomic"
 
-	"github.com/btcboost/copernicus/internal/btcjson"
 	"github.com/btcboost/copernicus/consensus"
+	"github.com/btcboost/copernicus/internal/btcjson"
 )
 
 var abcHandlers = map[string]commandHandler{

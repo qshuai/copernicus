@@ -21,8 +21,8 @@ import (
 	"time"
 
 	"github.com/astaxie/beego/logs"
-	"github.com/btcboost/copernicus/internal/btcjson"
 	"github.com/btcboost/copernicus/conf"
+	"github.com/btcboost/copernicus/internal/btcjson"
 )
 
 const (
@@ -51,15 +51,15 @@ func rpcDecodeHexError(gotHex string) *btcjson.RPCError {
 
 // Server provides a concurrent safe RPC server to a chain server.
 type Server struct {
-	started      int32
-	shutdown     int32
-	cfg          ServerConfig
-	authsha      [sha256.Size]byte
-	limitauthsha [sha256.Size]byte
-	numClients   int32
-	statusLines  map[int]string
-	statusLock   sync.RWMutex
-	wg           sync.WaitGroup
+	started                int32
+	shutdown               int32
+	cfg                    ServerConfig
+	authsha                [sha256.Size]byte
+	limitauthsha           [sha256.Size]byte
+	numClients             int32
+	statusLines            map[int]string
+	statusLock             sync.RWMutex
+	wg                     sync.WaitGroup
 	helpCacher             *helpCacher
 	requestProcessShutdown chan struct{}
 	quit                   chan int
@@ -431,7 +431,6 @@ func (s *Server) Start() {
 
 		s.jsonRPCRead(w, r, isAdmin)
 	})
-
 
 	for _, listener := range s.cfg.Listeners {
 		s.wg.Add(1)

@@ -7,8 +7,8 @@ import (
 	"math"
 
 	"github.com/btcboost/copernicus/blockchain"
-	"github.com/btcboost/copernicus/internal/btcjson"
 	"github.com/btcboost/copernicus/core"
+	"github.com/btcboost/copernicus/internal/btcjson"
 	"github.com/btcboost/copernicus/mempool"
 	"github.com/btcboost/copernicus/net/msg"
 	"github.com/btcboost/copernicus/policy"
@@ -38,8 +38,8 @@ var blockchainHandlers = map[string]commandHandler{
 	"preciousblock":         handlePreciousblock,   //complete
 
 	/*not shown in help*/
-	"invalidateblock":    handlInvalidateBlock,     //complete
-	"reconsiderblock":    handleReconsiderBlock,    //complete
+	"invalidateblock":    handlInvalidateBlock,  //complete
+	"reconsiderblock":    handleReconsiderBlock, //complete
 	"waitfornewblock":    handleWaitForNewBlock,
 	"waitforblock":       handleWaitForBlock,
 	"waitforblockheight": handleWaitForBlockHeight,
