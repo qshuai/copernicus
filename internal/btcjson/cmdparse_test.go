@@ -2,7 +2,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package btcjson
+package btcjson_test
 
 import (
 	"encoding/json"
@@ -10,7 +10,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/btcboost/copernicus/btcjson"
+	"github.com/btcboost/copernicus/internal/btcjson"
 )
 
 // TestAssignField tests the assignField function handles supported combinations

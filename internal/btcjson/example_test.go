@@ -2,13 +2,13 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package btcjson
+package btcjson_test
 
 import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/btcboost/copernicus/btcjson"
+	"github.com/btcboost/copernicus/internal/btcjson"
 )
 
 // This example demonstrates how to create and marshal a command into a JSON-RPC

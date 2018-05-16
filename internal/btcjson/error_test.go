@@ -2,12 +2,12 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package btcjson
+package btcjson_test
 
 import (
 	"testing"
 
-	"github.com/btcboost/copernicus/btcjson"
+	"github.com/btcboost/copernicus/internal/btcjson"
 )
 
 // TestErrorCodeStringer tests the stringized output for the ErrorCode type.
