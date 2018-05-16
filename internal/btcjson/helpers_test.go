@@ -2,13 +2,13 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package btcjson
+package btcjson_test
 
 import (
 	"reflect"
 	"testing"
 
-	"github.com/btcboost/copernicus/btcjson"
+	"github.com/btcboost/copernicus/internal/btcjson"
 )
 
 // TestHelpers tests the various helper functions which create pointers to
